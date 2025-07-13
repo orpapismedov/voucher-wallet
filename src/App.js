@@ -131,7 +131,9 @@ function VoucherRow({ voucher, onEdit, onEmpty, isArchive, onRestore, onDelete }
       >
         {voucher.name}
       </a>
-      <span className="voucher-amount">₪{voucher.amount}</span>
+      {!isArchive && (
+        <span className="voucher-amount">₪{voucher.amount}</span>
+      )}
       {!isArchive && (
         <>
           <button className="voucher-edit" onClick={() => onEdit(voucher)}>
@@ -161,6 +163,7 @@ function App() {
   const [archive, setArchive] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editVoucher, setEditVoucher] = useState(null);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
   // Real-time sync with Firestore
   useEffect(() => {
@@ -216,9 +219,14 @@ function App() {
 
   // Delete all vouchers from archive
   const handleDeleteAllArchive = async () => {
+    setShowArchiveConfirm(true);
+  };
+
+  const confirmDeleteAllArchive = async () => {
     const archiveDocs = await getDocs(collection(db, "archive"));
     const deletions = archiveDocs.docs.map(d => deleteDoc(doc(db, "archive", d.id)));
     await Promise.all(deletions);
+    setShowArchiveConfirm(false);
   };
 
   const total = wallet.reduce((sum, v) => sum + v.amount, 0);
@@ -272,6 +280,17 @@ function App() {
           onClose={() => setShowForm(false)}
           title={editVoucher ? 'ערוך שובר' : 'הוסף שובר חדש'}
         />
+      )}
+      {showArchiveConfirm && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h3>האם אתה בטוח שברצונך למחוק את כל השוברים מהארכיון?</h3>
+            <div className="modal-actions">
+              <button onClick={confirmDeleteAllArchive}>כן</button>
+              <button className="secondary" onClick={() => setShowArchiveConfirm(false)}>לא</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
