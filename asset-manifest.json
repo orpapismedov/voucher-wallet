@@ -1,0 +1,17 @@
+{
+  "files": {
+    "main.css": "/voucher-wallet/static/css/main.ba6b586a.css",
+    "main.js": "/voucher-wallet/static/js/main.bfb54326.js",
+    "static/js/453.6d951f8b.chunk.js": "/voucher-wallet/static/js/453.6d951f8b.chunk.js",
+    "static/media/money-woman.png": "/voucher-wallet/static/media/money-woman.76ea242ab445e9e9fe91.png",
+    "static/media/buyme.png": "/voucher-wallet/static/media/buyme.da730e2202d7c173273d.png",
+    "index.html": "/voucher-wallet/index.html",
+    "main.ba6b586a.css.map": "/voucher-wallet/static/css/main.ba6b586a.css.map",
+    "main.bfb54326.js.map": "/voucher-wallet/static/js/main.bfb54326.js.map",
+    "453.6d951f8b.chunk.js.map": "/voucher-wallet/static/js/453.6d951f8b.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.ba6b586a.css",
+    "static/js/main.bfb54326.js"
+  ]
+}
