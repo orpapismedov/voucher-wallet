@@ -1,7 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 import buymeLogo from './buyme.png';
-import moneyWoman from './money-woman.png';
+import { db } from './firebase';
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  getDocs,
+  onSnapshot
+} from "firebase/firestore";
 
 function uuid() {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -148,65 +157,68 @@ function VoucherRow({ voucher, onEdit, onEmpty, isArchive, onRestore, onDelete }
 }
 
 function App() {
-  const [wallet, setWallet] = useState([
-    { id: uuid(), name: 'BuyMe לפנינה', link: 'https://example.com/voucher1', amount: 50 },
-    { id: uuid(), name: 'שובר דוגמה', link: 'https://example.com/voucher2', amount: 25 },
-  ]);
-  const [archive, setArchive] = useState([
-    { id: uuid(), name: 'שובר בארכיון', link: 'https://example.com/voucher3', amount: 0 },
-  ]);
+  const [wallet, setWallet] = useState([]);
+  const [archive, setArchive] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editVoucher, setEditVoucher] = useState(null);
 
-  // Add new voucher
-  const handleAddVoucher = () => {
+  // Real-time sync with Firestore
+  useEffect(() => {
+    const unsubWallet = onSnapshot(collection(db, "wallet"), (snapshot) => {
+      setWallet(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubArchive = onSnapshot(collection(db, "archive"), (snapshot) => {
+      setArchive(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => {
+      unsubWallet();
+      unsubArchive();
+    };
+  }, []);
+
+  // Add or edit voucher
+  const handleSaveVoucher = async (data) => {
+    setShowForm(false); // <-- Close the modal immediately
     setEditVoucher(null);
-    setShowForm(true);
-  };
-
-  // Edit voucher
-  const handleEditVoucher = (voucher) => {
-    setEditVoucher(voucher);
-    setShowForm(true);
-  };
-
-  // Save voucher (add or edit)
-  const handleSaveVoucher = (data) => {
     if (editVoucher) {
-      setWallet(wallet =>
-        wallet.map(v =>
-          v.id === editVoucher.id ? { ...v, ...data } : v
-        )
-      );
+      await updateDoc(doc(db, "wallet", editVoucher.id), data);
     } else {
-      setWallet(wallet => [...wallet, { id: uuid(), ...data }]);
+      await addDoc(collection(db, "wallet"), data);
     }
-    setShowForm(false);
-    setEditVoucher(null);
   };
 
-  // Move voucher to archive (set amount to 0) - FIXED: avoid double archive
-  const handleEmptyVoucher = (id) => {
+  // Move voucher to archive
+  const handleEmptyVoucher = async (id) => {
     const voucher = wallet.find(v => v.id === id);
     if (!voucher) return;
-    setWallet(wallet => wallet.filter(v => v.id !== id));
-    setArchive(archive => [...archive, { ...voucher, amount: 0 }]);
+    // Add to archive first, and only if successful, delete from wallet
+    const { id: _, ...voucherData } = voucher;
+    try {
+      await addDoc(collection(db, "archive"), { ...voucherData, amount: 0 });
+      await deleteDoc(doc(db, "wallet", id));
+    } catch (err) {
+      alert("שגיאה בארכוב השובר. נסה שוב.");
+      console.error(err);
+    }
   };
 
   // Restore voucher from archive
-  const handleRestoreVoucher = (voucher) => {
-    setArchive(archive => archive.filter(v => v.id !== voucher.id));
-    setWallet(wallet => [...wallet, voucher]);
+  const handleRestoreVoucher = async (voucherWithAmount) => {
+    const { id, ...rest } = voucherWithAmount;
+    await addDoc(collection(db, "wallet"), rest);
+    await deleteDoc(doc(db, "archive", id));
   };
 
   // Delete voucher from archive
-  const handleDeleteArchiveVoucher = (id) => {
-    setArchive(archive => archive.filter(v => v.id !== id));
+  const handleDeleteArchiveVoucher = async (id) => {
+    await deleteDoc(doc(db, "archive", id));
   };
 
   // Delete all vouchers from archive
-  const handleDeleteAllArchive = () => {
-    setArchive([]);
+  const handleDeleteAllArchive = async () => {
+    const archiveDocs = await getDocs(collection(db, "archive"));
+    const deletions = archiveDocs.docs.map(d => deleteDoc(doc(db, "archive", d.id)));
+    await Promise.all(deletions);
   };
 
   const total = wallet.reduce((sum, v) => sum + v.amount, 0);
@@ -215,14 +227,9 @@ function App() {
     <div className="app-bg" style={{ direction: 'rtl' }}>
       <div className="container">
         <div className="card">
-          <img
-            src={buymeLogo}
-            alt="BUYME"
-            className="buyme-logo"
-          />
-
+          <img src={buymeLogo} alt="BUYME" className="buyme-logo" />
           <h2>ארנק שוברים</h2>
-          <button className="add-btn" onClick={handleAddVoucher}>
+          <button className="add-btn" onClick={() => { setEditVoucher(null); setShowForm(true); }}>
             הוסף שובר חדש
           </button>
           <div className="voucher-list">
@@ -231,7 +238,7 @@ function App() {
               <VoucherRow
                 key={voucher.id}
                 voucher={voucher}
-                onEdit={handleEditVoucher}
+                onEdit={v => { setEditVoucher(v); setShowForm(true); }}
                 onEmpty={handleEmptyVoucher}
                 isArchive={false}
               />
